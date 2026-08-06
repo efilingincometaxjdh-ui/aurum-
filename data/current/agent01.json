@@ -1,0 +1,15 @@
+{
+    "agent": "Agent01",
+    "version": "0.3",
+    "generated_at": "...",
+    "status": "SUCCESS",
+
+    "data": {
+
+        "gold_bias":"BULLISH",
+        "usd_bias":"BEARISH",
+        "confidence":74,
+        "news_risk":"LOW"
+
+    }
+}

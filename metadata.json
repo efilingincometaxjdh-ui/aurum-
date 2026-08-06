@@ -1,0 +1,6 @@
+{
+  "name": "Aurum - XAUUSD Intelligence Engine",
+  "description": "Modular XAUUSD intelligence infrastructure with deterministic, fail-closed decision & permission gates.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
