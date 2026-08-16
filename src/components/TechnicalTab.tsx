@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Clock, RefreshCw, TrendingUp, TrendingDown, Layers, BarChart2 } from 'lucide-react';
+import { Activity, Clock, RefreshCw, TrendingUp, TrendingDown, Layers, BarChart2, Compass, Zap, Crosshair, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { PipelineSummary, Timeframe, Candle } from '../types.js';
 import { fetchCandles } from '../services/api.js';
@@ -20,7 +20,8 @@ export const TechnicalTab: React.FC<TechnicalTabProps> = ({ pipeline }) => {
     async function loadCandles() {
       setIsLoadingCandles(true);
       try {
-        const data = await fetchCandles(selectedTf, 35);
+        const activeSym = pipeline?.market_ticker?.symbol;
+        const data = await fetchCandles(selectedTf, 35, activeSym);
         setCandles(data);
       } catch (err) {
         console.error('Failed to load chart candles', err);
@@ -29,7 +30,7 @@ export const TechnicalTab: React.FC<TechnicalTabProps> = ({ pipeline }) => {
       }
     }
     loadCandles();
-  }, [selectedTf]);
+  }, [selectedTf, pipeline?.market_ticker?.symbol]);
 
   if (!agent02) return null;
 
@@ -74,7 +75,7 @@ export const TechnicalTab: React.FC<TechnicalTabProps> = ({ pipeline }) => {
           <div className="flex items-center gap-2">
             <BarChart2 className="w-4 h-4 text-amber-400" />
             <h3 className="font-display text-sm font-semibold text-white uppercase tracking-wider">
-              XAUUSD Price Chart ({selectedTf})
+              {pipeline?.market_ticker?.symbol || 'XAUUSD'} Price Chart ({selectedTf})
             </h3>
           </div>
           {tfData?.close_price && (
@@ -113,51 +114,224 @@ export const TechnicalTab: React.FC<TechnicalTabProps> = ({ pipeline }) => {
         </div>
       </div>
 
-      {/* Indicator Cards Grid */}
+      {/* Indicator & SMC Analytics Dashboard */}
       {tfData ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider block mb-1">EMA 20</span>
-            <span className="font-mono text-lg font-bold text-amber-400">${tfData.ema20?.toFixed(2) || 'N/A'}</span>
+        <div className="space-y-6">
+          {/* Row 1: Traditional Indicators & Core SMC Status */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-mono block mb-1">EMA 20</span>
+              <span className="font-mono text-base font-bold text-amber-400">${tfData.ema20?.toFixed(2) || 'N/A'}</span>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-mono block mb-1">EMA 50</span>
+              <span className="font-mono text-base font-bold text-slate-200">${tfData.ema50?.toFixed(2) || 'N/A'}</span>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-mono block mb-1">RSI (14)</span>
+              <span className={`font-mono text-base font-bold block ${
+                (tfData.rsi || 50) > 70 ? 'text-rose-400' : (tfData.rsi || 50) < 30 ? 'text-emerald-400' : 'text-amber-300'
+              }`}>
+                {tfData.rsi || 'N/A'}
+              </span>
+              <span className="text-[9px] text-slate-500 block mt-0.5">
+                {(tfData.rsi || 50) > 70 ? 'Overbought' : (tfData.rsi || 50) < 30 ? 'Oversold' : 'Neutral'}
+              </span>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-mono block mb-1">ADX (14)</span>
+              <span className="font-mono text-base font-bold text-slate-200">{tfData.adx || 'N/A'}</span>
+              <span className="text-[9px] text-slate-500 block mt-0.5">
+                {(tfData.adx || 0) >= 25 ? 'Strong Trend' : 'Weak Trend'}
+              </span>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-mono block mb-1">ATR (14)</span>
+              <span className="font-mono text-base font-bold text-slate-200">${tfData.atr || 'N/A'}</span>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-mono block mb-1">Market Regime</span>
+              <span className="font-mono text-xs font-bold text-amber-400 block truncate">
+                {tfData.smc?.regime?.classification?.replace('TRENDING_', '') || 'RANGING'}
+              </span>
+              <span className="text-[9px] text-slate-500 block mt-0.5">
+                Vol: {tfData.smc?.regime.volatilityIndex.toFixed(1) || '0.0'}
+              </span>
+            </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider block mb-1">EMA 50</span>
-            <span className="font-mono text-lg font-bold text-slate-200">${tfData.ema50?.toFixed(2) || 'N/A'}</span>
+          {/* Row 2: SMC Contextual Information */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Session & Dealing Range Card */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+              <div>
+                <h4 className="font-display text-xs font-semibold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <Compass className="w-4 h-4 text-amber-400" />
+                  Dealing Range & Session Context
+                </h4>
+
+                <div className="space-y-3 font-mono text-xs">
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                    <span className="text-slate-400">Trading Session</span>
+                    <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold">
+                      {tfData.smc?.context.currentSession || 'NEWYORK'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                    <span className="text-slate-400">Pricing Zone</span>
+                    <span className={`px-2 py-0.5 rounded font-bold ${
+                      tfData.smc?.context.pricingZone === 'PREMIUM' ? 'bg-rose-500/10 text-rose-400' :
+                      tfData.smc?.context.pricingZone === 'DISCOUNT' ? 'bg-emerald-500/10 text-emerald-400' :
+                      'bg-slate-800 text-slate-300'
+                    }`}>
+                      {tfData.smc?.context.pricingZone || 'EQUILIBRIUM'}
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-1">
+                    <div className="flex justify-between text-slate-400">
+                      <span>Dealing Range</span>
+                      <span className="text-slate-200">
+                        ${tfData.smc?.context.dealingRange.low.toFixed(2)} - ${tfData.smc?.context.dealingRange.high.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Market Structure (BOS / CHoCH) Card */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+              <h4 className="font-display text-xs font-semibold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-400" />
+                Structural Breaks (BOS / CHoCH)
+              </h4>
+
+              <div className="space-y-2 max-h-[145px] overflow-y-auto pr-1">
+                {tfData.smc?.choch.slice(-1).map((ch, idx) => (
+                  <div key={`ch-${idx}`} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 font-mono text-xs">
+                    <span className="text-amber-400 font-bold">CHoCH Breakout</span>
+                    <span className={`font-semibold ${ch.type.includes('BULLISH') ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      ${ch.price.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+                {tfData.smc?.bos.slice(-2).map((b, idx) => (
+                  <div key={`bos-${idx}`} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 font-mono text-xs">
+                    <span className="text-slate-300">BOS Breakout</span>
+                    <span className={`font-semibold ${b.type.includes('BULLISH') ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      ${b.price.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+                {(!tfData.smc?.bos.length && !tfData.smc?.choch.length) && (
+                  <div className="text-center py-6 text-slate-500 font-mono text-xs">
+                    No structural breaks in current range.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Institutional Block & Gaps Card */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+              <h4 className="font-display text-xs font-semibold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Crosshair className="w-4 h-4 text-amber-400" />
+                Supply / Demand Order Blocks (OB)
+              </h4>
+
+              <div className="space-y-2 max-h-[145px] overflow-y-auto pr-1">
+                {tfData.smc?.orderBlocks.slice(0, 3).map((ob, idx) => (
+                  <div key={`ob-${idx}`} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/50 font-mono text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${ob.type === 'BULLISH' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                      <span className="text-slate-300">{ob.type === 'BULLISH' ? 'Demand Block' : 'Supply Block'}</span>
+                    </div>
+                    <span className={`font-semibold ${ob.type === 'BULLISH' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      ${ob.low.toFixed(2)} - ${ob.high.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+                {!tfData.smc?.orderBlocks.length && (
+                  <div className="text-center py-6 text-slate-500 font-mono text-xs">
+                    No active institutional order blocks.
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider block mb-1">RSI (14)</span>
-            <span className={`font-mono text-lg font-bold ${
-              (tfData.rsi || 50) > 70 ? 'text-rose-400' : (tfData.rsi || 50) < 30 ? 'text-emerald-400' : 'text-amber-300'
-            }`}>
-              {tfData.rsi || 'N/A'}
-            </span>
-            <span className="text-[10px] text-slate-500 block mt-0.5">
-              {(tfData.rsi || 50) > 70 ? 'Overbought' : (tfData.rsi || 50) < 30 ? 'Oversold' : 'Neutral'}
-            </span>
-          </div>
+          {/* Row 3: Imbalance (FVG) and Liquidity Sweeps */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Fair Value Gaps (FVG) */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-display text-xs font-semibold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-amber-400" />
+                  Fair Value Gaps (FVG / Imbalances)
+                </h4>
+                <span className="text-[10px] font-mono text-slate-500">Imbalance Ratio: {(tfData.smc?.context.imbalanceRatio || 0).toFixed(1)}%</span>
+              </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider block mb-1">ADX (14)</span>
-            <span className="font-mono text-lg font-bold text-slate-200">{tfData.adx || 'N/A'}</span>
-            <span className="text-[10px] text-slate-500 block mt-0.5">
-              {(tfData.adx || 0) >= 25 ? 'Strong Trend' : 'Weak Trend'}
-            </span>
-          </div>
+              <div className="space-y-2 font-mono text-xs max-h-[150px] overflow-y-auto pr-1">
+                {tfData.smc?.fvgs.slice(0, 3).map((f, idx) => (
+                  <div key={`fvg-${idx}`} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                    <span className={f.type === 'BULLISH' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                      {f.type === 'BULLISH' ? 'Bullish Gap (Discount)' : 'Bearish Gap (Premium)'}
+                    </span>
+                    <span className="text-slate-300">
+                      ${f.bottom.toFixed(2)} - ${f.top.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+                {!tfData.smc?.fvgs.length && (
+                  <div className="text-center py-8 text-slate-500 text-xs">
+                    No unmitigated imbalances (FVGs) in this window.
+                  </div>
+                )}
+              </div>
+            </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider block mb-1">ATR (14)</span>
-            <span className="font-mono text-lg font-bold text-slate-200">${tfData.atr || 'N/A'}</span>
-          </div>
+            {/* Liquidity Highs/Lows and Sweeps */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+              <h4 className="font-display text-xs font-semibold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-amber-400" />
+                Liquidity Pools & Sweeps Analysis
+              </h4>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider block mb-1">Trend Signal</span>
-            <span className={`font-mono text-sm font-bold block ${
-              tfData.trend === 'Bullish' ? 'text-emerald-400' : tfData.trend === 'Bearish' ? 'text-rose-400' : 'text-slate-400'
-            }`}>
-              {tfData.trend || 'N/A'}
-            </span>
+              <div className="space-y-2 font-mono text-xs max-h-[150px] overflow-y-auto pr-1">
+                {tfData.smc?.liquidity.sweeps.slice(-3).map((sw, idx) => (
+                  <div key={`sweep-${idx}`} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                    <span className="text-amber-400 font-bold">Liquidity Sweep</span>
+                    <span className="text-slate-300">
+                      Swept ${sw.triggerPrice.toFixed(2)} at ${sw.sweepPrice.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+                {tfData.smc?.liquidity.equalHighs.map((eh, idx) => (
+                  <div key={`eh-${idx}`} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/50">
+                    <span className="text-rose-400 font-bold">EQH (Equal Highs Pool)</span>
+                    <span className="text-slate-300">${eh.price.toFixed(2)}</span>
+                  </div>
+                ))}
+                {tfData.smc?.liquidity.equalLows.map((el, idx) => (
+                  <div key={`el-${idx}`} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/50">
+                    <span className="text-emerald-400 font-bold">EQL (Equal Lows Pool)</span>
+                    <span className="text-slate-300">${el.price.toFixed(2)}</span>
+                  </div>
+                ))}
+                {(!tfData.smc?.liquidity.sweeps.length && !tfData.smc?.liquidity.equalHighs.length && !tfData.smc?.liquidity.equalLows.length) && (
+                  <div className="text-center py-8 text-slate-500 text-xs">
+                    No significant liquidity pools detected.
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       ) : (

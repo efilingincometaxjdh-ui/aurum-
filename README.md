@@ -1,6 +1,6 @@
-# Rahul AI Team
+# Aurum
 
-Rahul AI Team is modular XAUUSD intelligence infrastructure built around deterministic, fail-closed contracts. It is **not an autonomous trading system**.
+Aurum is modular XAUUSD intelligence infrastructure built around deterministic, fail-closed contracts. It is **not an autonomous trading system**.
 
 ## Deterministic V1 architecture
 

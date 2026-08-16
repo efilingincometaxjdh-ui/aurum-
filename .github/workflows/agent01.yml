@@ -1,4 +1,4 @@
-name: Rahul AI - Agent 01
+name: Aurum - Agent 01
 
 on:
   workflow_dispatch: {}
@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Get Rahul AI Team
+      - name: Get Aurum Team
         uses: actions/checkout@v4
 
       - name: Setup Python

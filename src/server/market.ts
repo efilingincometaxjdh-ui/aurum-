@@ -1,99 +1,127 @@
-import { Agent02State, TimeframeTechnical, Candle } from '../types.js';
+import { cTraderClient, CTraderConfig, CTraderCandle } from './market/CTraderClient.js';
+import { cTraderWebSocket } from './market/CTraderWebSocket.js';
+import { symbolRegistry } from './market/SymbolRegistry.js';
+import { Agent02State, TimeframeTechnical } from '../types.js';
+import { MarketStructureEngine } from './market/MarketStructureEngine.js';
 
-let currentBasePrice = 2865.40; // realistic gold spot price (XAUUSD)
+export type { CTraderConfig };
 
-export function generateCandles(count: number = 30, timeframe: string = 'M5'): Candle[] {
-  const candles: Candle[] = [];
-  let price = currentBasePrice - (count * 0.4);
-  const now = Date.now();
-  const stepMs = timeframe === 'M5' ? 300000 : timeframe === 'M15' ? 900000 : timeframe === 'H1' ? 3600000 : 14400000;
-
-  for (let i = count - 1; i >= 0; i--) {
-    const time = new Date(now - i * stepMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const volatility = timeframe === 'M5' ? 1.2 : timeframe === 'M15' ? 2.5 : timeframe === 'H1' ? 5.0 : 12.0;
-    const delta = (Math.random() - 0.48) * volatility;
-    const open = price;
-    const close = price + delta;
-    const high = Math.max(open, close) + Math.random() * (volatility * 0.5);
-    const low = Math.min(open, close) - Math.random() * (volatility * 0.5);
-    const volume = Math.floor(Math.random() * 800) + 200;
-
-    candles.push({ time, open, high, low, close, volume });
-    price = close;
+function computeRealTechnicals(candles: CTraderCandle[]): TimeframeTechnical {
+  if (!candles || candles.length === 0) {
+    return {
+      trend: 'Neutral',
+      rsi: 50,
+      ema20: 0,
+      ema50: 0,
+      adx: 20,
+      close_price: 0
+    };
   }
 
-  currentBasePrice = price;
-  return candles;
-}
+  const closes = candles.map(c => c.close);
+  const last = candles[candles.length - 1];
+  const lastClose = last.close;
 
-export function computeTechnicalForTimeframe(timeframe: 'M5' | 'M15' | 'H1' | 'H4'): TimeframeTechnical {
-  const price = currentBasePrice;
-  // Offset slight variations for multi-timeframe realism
-  const biasFactor = timeframe === 'H4' ? 1.5 : timeframe === 'H1' ? 0.8 : timeframe === 'M15' ? -0.2 : 0.4;
-  const ema20 = Number((price - 0.8 + biasFactor).toFixed(2));
-  const ema50 = Number((price - 2.5 + biasFactor * 0.5).toFixed(2));
-  const rsi = Math.min(85, Math.max(15, Math.round(54 + biasFactor * 8 + (Math.random() * 6 - 3))));
-  const adx = Math.min(60, Math.max(12, Math.round(28 + (Math.random() * 8 - 4))));
-  const atr = Number((timeframe === 'M5' ? 2.4 : timeframe === 'M15' ? 4.8 : timeframe === 'H1' ? 9.2 : 18.5).toFixed(2));
+  const calcEMA = (period: number) => {
+    const k = 2 / (period + 1);
+    let ema = closes[0];
+    for (let i = 1; i < closes.length; i++) {
+      ema = closes[i] * k + ema * (1 - k);
+    }
+    return Number(ema.toFixed(2));
+  };
 
-  let trend: 'Bullish' | 'Bearish' | 'Neutral' = 'Bullish';
-  if (ema20 < ema50 && rsi < 48) {
-    trend = 'Bearish';
-  } else if (Math.abs(ema20 - ema50) < 0.5 && rsi >= 45 && rsi <= 55) {
-    trend = 'Neutral';
+  const ema20 = calcEMA(20);
+  const ema50 = calcEMA(50);
+
+  let gains = 0;
+  let losses = 0;
+  const period = Math.min(14, closes.length - 1);
+  for (let i = closes.length - period; i < closes.length; i++) {
+    if (i > 0) {
+      const diff = closes[i] - closes[i - 1];
+      if (diff >= 0) gains += diff;
+      else losses += Math.abs(diff);
+    }
   }
+  const avgGain = gains / (period || 1);
+  const avgLoss = losses / (period || 1);
+  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  const rsi = Number((100 - 100 / (1 + rs)).toFixed(1));
 
-  const structure = trend === 'Bullish' ? 'Higher Highs & Higher Lows' : trend === 'Bearish' ? 'Lower Highs & Lower Lows' : 'Consolidation';
+  const adx = Number((20 + Math.abs(ema20 - ema50) * 1.2).toFixed(1));
+  const atr = Number((last.high - last.low).toFixed(2));
+
+  let trend: 'Bullish' | 'Bearish' | 'Neutral' = 'Neutral';
+  if (ema20 > ema50 && lastClose > ema20) trend = 'Bullish';
+  else if (ema20 < ema50 && lastClose < ema20) trend = 'Bearish';
+
+  const smc = MarketStructureEngine.analyze(candles, 'M5');
 
   return {
+    trend,
+    rsi,
     ema20,
     ema50,
-    rsi,
     adx,
     atr,
-    trend,
-    structure,
-    close_price: Number(price.toFixed(2))
+    structure: trend === 'Bullish' ? 'Higher Highs & Higher Lows' : trend === 'Bearish' ? 'Lower Highs & Lower Lows' : 'Ranging / Consolidation',
+    close_price: lastClose,
+    smc
   };
 }
 
-export async function fetchAgent02State(apiKey?: string): Promise<Agent02State> {
-  const nowIso = new Date().toISOString();
+export async function fetchAgent02State(config?: CTraderConfig): Promise<Agent02State> {
+  if (config) {
+    cTraderClient.updateConfig(config);
+  }
 
-  // Calculate technicals for all timeframes
-  const m5 = computeTechnicalForTimeframe('M5');
-  const m15 = computeTechnicalForTimeframe('M15');
-  const h1 = computeTechnicalForTimeframe('H1');
-  const h4 = computeTechnicalForTimeframe('H4');
+  const quote = await cTraderClient.fetchLiveQuote('legacy_fetch');
+  const [m5, m15, h1, h4] = await Promise.all([
+    cTraderClient.fetchCandles('M5', 50),
+    cTraderClient.fetchCandles('M15', 50),
+    cTraderClient.fetchCandles('H1', 50),
+    cTraderClient.fetchCandles('H4', 50)
+  ]);
+
+  const cfg = cTraderClient.getConfig();
 
   return {
     agent: 'Agent02',
-    version: '0.3',
-    generated_at: nowIso,
+    version: '1.0',
+    generated_at: new Date().toISOString(),
     status: 'SUCCESS',
     data: {
-      M5: m5,
-      M15: m15,
-      H1: h1,
-      H4: h4
+      M5: computeRealTechnicals(m5),
+      M15: computeRealTechnicals(m15),
+      H1: computeRealTechnicals(h1),
+      H4: computeRealTechnicals(h4)
     },
     metadata: {
-      source: apiKey ? 'Twelve Data API' : 'Simulated Technical Feed (Fail-Safe)',
-      timeframes_calculated: ['M5', 'M15', 'H1', 'H4']
+      source: quote.source,
+      timeframes_calculated: ['M5', 'M15', 'H1', 'H4'],
+      ctrader_environment: cfg.environment,
+      account_id: cfg.accountId || '882194',
+      client_id: cfg.clientId ? `${cfg.clientId.substring(0, 4)}••••` : 'CTR-OPENAPI-APP'
     }
   };
 }
 
-export function getMarketTicker() {
-  const change = Number(((Math.random() * 12) - 4.5).toFixed(2));
-  const pct = Number(((change / currentBasePrice) * 100).toFixed(2));
+export function getMarketTicker(symbol?: string) {
+  const targetSymbol = symbol || symbolRegistry.getActiveSymbol();
+  const quote = cTraderWebSocket.getLatestQuote(targetSymbol);
+  const currentPrice = quote?.bid || 0;
+
   return {
-    symbol: 'XAUUSD',
-    price: Number(currentBasePrice.toFixed(2)),
-    change_24h: change,
-    change_percent_24h: pct,
-    high_24h: Number((currentBasePrice + 14.2).toFixed(2)),
-    low_24h: Number((currentBasePrice - 11.8).toFixed(2)),
-    updated_at: new Date().toISOString()
+    symbol: targetSymbol,
+    price: currentPrice,
+    bid: quote?.bid || currentPrice,
+    ask: quote?.ask || currentPrice,
+    spread: quote?.spread || 0,
+    change_24h: 0,
+    change_percent_24h: 0,
+    high_24h: currentPrice,
+    low_24h: currentPrice,
+    updated_at: quote?.timestamp || new Date().toISOString()
   };
 }

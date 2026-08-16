@@ -13,6 +13,83 @@ export const PipelineTab: React.FC<PipelineTabProps> = ({ pipeline }) => {
 
   return (
     <div className="space-y-6">
+      {/* Evidence Infrastructure Coverage Reporting Card */}
+      {pipeline.evidence_coverage && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-800">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                <h3 className="font-display text-sm font-semibold text-white uppercase tracking-wider">
+                  Evidence Infrastructure Coverage & Validation
+                </h3>
+              </div>
+              <p className="text-xs text-slate-400">
+                Deterministic evidence health score calculated across cTrader spot quotes, multi-timeframe candles, and macro RSS feeds.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <span className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${
+                pipeline.evidence_coverage.health === 'FULL_COVERAGE'
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  : pipeline.evidence_coverage.health === 'PARTIAL_COVERAGE'
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+              }`}>
+                {(pipeline.evidence_coverage.health || '').replace('_', ' ')}
+              </span>
+              <span className="text-xl font-mono font-extrabold text-white">
+                {pipeline.evidence_coverage.score}%
+              </span>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800 mb-4">
+            <div
+              className={`h-full transition-all duration-500 ${
+                pipeline.evidence_coverage.score >= 90 ? 'bg-emerald-500' :
+                pipeline.evidence_coverage.score >= 60 ? 'bg-amber-500' : 'bg-rose-500'
+              }`}
+              style={{ width: `${pipeline.evidence_coverage.score}%` }}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            {/* Validation Flags */}
+            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800/80">
+              <span className="text-slate-400 font-medium block mb-2">Active Validation Contracts</span>
+              <div className="flex flex-wrap gap-1.5">
+                {pipeline.evidence_coverage.flags.map((flag, idx) => (
+                  <span key={idx} className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono text-[10px]">
+                    ✓ {flag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Missing Evidence Tracking */}
+            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800/80">
+              <span className="text-slate-400 font-medium block mb-2">Missing Evidence Flags</span>
+              {pipeline.evidence_coverage.missing.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {pipeline.evidence_coverage.missing.map((item, idx) => (
+                    <span key={idx} className="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded font-mono text-[10px]">
+                      ⚠ {item}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-emerald-400 font-mono text-[11px] flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  No missing evidence detected — 100% Data Integrity
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Overview Banner */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
         <div className="flex items-center gap-2 mb-1">

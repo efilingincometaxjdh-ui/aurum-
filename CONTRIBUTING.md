@@ -1,4 +1,4 @@
-# Contributing — Rahul AI Team
+# Contributing — Aurum
 
 This repository contains safety-critical trading intelligence and evidence infrastructure.
 Before contributing, read:
